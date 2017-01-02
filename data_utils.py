@@ -37,7 +37,7 @@ def multigen(gen_func):
     return _multigen
 
 @multigen
-def process_file_data(f_name, process_fn=None, flatten=False):
+def process_file_data(f_name, process_fn=None, batch_size=None, flatten=False):
 	with open(f_name) as file:
 		for line in file:
 			if flatten:
@@ -45,6 +45,12 @@ def process_file_data(f_name, process_fn=None, flatten=False):
 					yield word
 				yield "<eos>"
 			else:
-				yield [process_fn(x) if process_fn else x for x in (line.split() + ['<eos>'])]
+				 _partition_sentence_by_batch_size([process_fn(x) if process_fn else x for x in (line.split() + ['<eos>'])], batch_size)
 
-def _batch_size_chunks()
+def _partition_sentence_by_batch_size(sentence, batch_size):
+	if not batch_size or len(sentence) <= batch_size:
+		yield sentence
+	total_bins = len(sentence) / batch_size
+	total_bins = total_bins
+	for i in range(0, len(sentence), total_bins):
+		yield sentence[i: i+total_bins]
