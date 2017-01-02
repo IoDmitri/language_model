@@ -124,6 +124,6 @@ class Language_model(object):
 
     def train_on_file(self, fname):
         self.vocab = Vocab(process_file_data(fname, flatten=True))
-        self.train(process_file_data(fname, process_fn=self.vocab.encode))
+        self.train(process_file_data(fname, process_fn=self.vocab.encode, batch_size=self._batch_size))
 
 
