@@ -5,6 +5,7 @@ import tensorflow as tf
 
 from tensorflow.python.ops.seq2seq import sequence_loss
 from data_utils import data_iterator, process_file_data
+from vocab import Vocab
 # from tensorflow.nn.rnn_cell import GRUCell, DropoutWrapper
 
 
@@ -52,46 +53,46 @@ class Language_model(object):
 
     def _projection_layer(self, rnn_ouputs):
         #outputs will be off size [batch x max_step x hidden_size]
-        rnn_ouputs = [tf.squeeze(s, [1]) for s in tf.split(1, self._max_steps, rnn_ouputs)] 
         with tf.variable_scope("Projection") as scope:
+            flattened = tf.reshape(tf.concat(-1, rnn_ouputs), (-1, self._hidden_size), name="flattened")
             U = tf.get_variable("U", [self._hidden_size, len(self.vocab)])
             b_2 = tf.get_variable("B", [len(self.vocab)])
-            outputs = [tf.matmul(x, U) + b_2 for x in rnn_ouputs]
+            outputs = tf.matmul(flattened, U) + b_2       
+        # rnn_ouputs = [tf.squeeze(s, [1]) for s in tf.split(1, self._max_steps, rnn_ouputs)] 
+        # with tf.variable_scope("Projection") as scope:
+        #     U = tf.get_variable("U", [self._hidden_size, len(self.vocab)])
+        #     b_2 = tf.get_variable("B", [len(self.vocab)])
+        #     outputs = [tf.matmul(x, U) + b_2 for x in rnn_ouputs]
 
-        return outputs
+            return outputs
 
     def _compute_loss(self,projected_outputs):
-        projected_outputs = tf.reshape(tf.concat(1, projected_outputs), [-1, len(self.vocab)])
         ones = [tf.ones([self._batch_size * self._max_steps], tf.float32)]
         seq_loss = sequence_loss(
             [projected_outputs], 
             [tf.reshape(self.label_placeholder, [-1])], 
             ones
         )
-        print "Sequence loss - {0}".format(seq_loss)
         tf.add_to_collection('total_loss', seq_loss)
         loss = tf.add_n(tf.get_collection('total_loss')) 
-        print "Loss - {0}".format(loss)
         return loss
 
     def _add_train_step(self, loss):
         opt = tf.train.AdamOptimizer(self._lr)
         return opt.minimize(loss)
 
-    def _run_epoch(self, data, session, inputs, rnn_ouputs, loss, trainOp, verbose=10):
+    def _run_epoch(self, data, session, inputs, rnn_ouputs, loss_op, trainOp, verbose=10):
         with session.as_default() as sess:
             total_steps = sum(1 for x in data_iterator(data, self._batch_size, self._max_steps))
             train_loss = []
             for step, (x,y, l) in enumerate(data_iterator(data, self._batch_size, self._max_steps)):
-                print "step - {0}".format(step)
                 feed = {
                     self.input_placeholder: x,
                     self.label_placeholder: y,
                     self.sequence_length: l,
                     self._dropout_placeholder: self._dropout,
                 }
-                _, loss = sess.run([trainOp, loss], feed_dict=feed)
-                print "loss - {0}".format(loss)
+                loss, _ = sess.run([loss_op, trainOp], feed_dict=feed)
                 train_loss.append(loss)
                 if verbose and step % verbose == 0:
                     sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
@@ -121,14 +122,8 @@ class Language_model(object):
                 train_pp = self._run_epoch(data, sess, inputs, rnn_ouputs, loss, trainOp, verbose)
                 print "Training preplexity for batch {} - {}".format(epoch, train_pp)
 
+    def train_on_file(self, fname):
+        self.vocab = Vocab(process_file_data(fname, flatten=True))
+        self.train(process_file_data(fname, process_fn=self.vocab.encode))
 
-    def _encode_dataset(self, data):
-        return [self.vocab.encode(x) for x in data]
-
-    def _build_vocab(self,data):
-        pass
-        # TO DO- implement with Vocab class
-            
-
-                
 

@@ -8,6 +8,7 @@ def data_iterator(data, batch_size, max_length_size):
 	sizes = np.zeros([batch_size])
 	i = 1
 	for ex in data:
+		print "ex - {0}".format(ex)
 		#single example
 		if i > batch_size:
 			yield batch_data, labels, sizes
@@ -26,7 +27,24 @@ def data_iterator(data, batch_size, max_length_size):
 	#at this point we can't fill any more of the batch, so yeild what we've got
 	yield batch_data, labels, sizes
 
-def process_file_data(f_name, process_fn=None):
+def multigen(gen_func):
+    class _multigen(object):
+        def __init__(self, *args, **kwargs):
+            self.__args = args
+            self.__kwargs = kwargs
+        def __iter__(self):
+            return gen_func(*self.__args, **self.__kwargs)
+    return _multigen
+
+@multigen
+def process_file_data(f_name, process_fn=None, flatten=False):
 	with open(f_name) as file:
 		for line in file:
-			yield [process_fn(x) if process_fn else x for x in (line.split() + ['<eos>'])] 
+			if flatten:
+				for word in line.split():
+					yield word
+				yield "<eos>"
+			else:
+				yield [process_fn(x) if process_fn else x for x in (line.split() + ['<eos>'])]
+
+def _batch_size_chunks()
