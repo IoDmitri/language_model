@@ -139,6 +139,7 @@ class Language_model(object):
         self.vocab = Vocab.load()
         model_name = model_name if model_name else self._name
         path = path if path else "./models/" 
+        self._setup_graph()
         restorer = tf.train.import_meta_graph(path + model_name + ".meta")
         restorer.restore(self._current_session, tf.train.latest_checkpoint(path))
 
@@ -153,27 +154,33 @@ class Language_model(object):
 
 
     def generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, temp=1.0):
-        state = self.initial_state.eval()
-        # Imagine tokens as a batch size of one, length of len(tokens[0])
-        tokens = [self.vocab.encode(word) for word in starting_text.split()]
-        for i in xrange(stop_length):
-            state, y_pred = self._current_session.run(
-                [self.final_state, self.predictions[-1]], feed_dict= {
-                    self.input_placeholder : [tokens[-1:]],
-                    self.initial_state: state,
-                    self._dropout_placeholder: self._dropout,
-                    self.sequence_length: [1] 
-                }
-            )
-            next_word_idx = sample(y_pred[0], temperature=temp)
-            tokens.append(next_word_idx)
-            if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
-                break
-        output = [model.vocab.decode(word_idx) for word_idx in tokens]
-        return output
+        with self._current_session as sess:
+            state = self.initial_state.eval()
+            # Imagine tokens as a batch size of one, length of len(tokens[0])
+            tokens = [self.vocab.encode(word) for word in starting_text.split()]
+            for i in xrange(stop_length):
+                state, y_pred = self._current_session.run(
+                    [self.final_state, self.predictions[-1]], feed_dict= {
+                        self.input_placeholder : [tokens[-1:]],
+                        self.initial_state: state,
+                        self._dropout_placeholder: self._dropout,
+                        self.sequence_length: [1] 
+                    }
+                )
+                next_word_idx = sample(y_pred[0], temperature=temp)
+                tokens.append(next_word_idx)
+                if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
+                    break
+            output = [model.vocab.decode(word_idx) for word_idx in tokens]
+            return output
 
     def generate_sentence(self, *args, **kwargs):
         """Convenice to generate a sentence from the model."""
         return generate_text(*args, stop_tokens=['<eos>', '<pad>'], **kwargs)
+
+    def _maybe_initialize(self):
+        if not self._is_initialized:
+            pass
+
 
 
