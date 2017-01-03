@@ -40,10 +40,11 @@ class Vocab(object):
   def decode(self, index):
     return self.index_to_word[index]
 
-  def save(self, path="./model/vocab/vocab.pkl"):
+  def save(self, path="./models/vocab.pkl"):
     pickle.dump(self, open(path, 'wb'))
 
-  def load(path="./model/vocab/vocab.pkl"):
+  @staticmethod
+  def load(path="./models/vocab.pkl"):
     return pickle.load(open(path, 'rb'))
 
   def __len__(self):

@@ -136,6 +136,7 @@ class Language_model(object):
                 print "saved model"
 
     def restore(self, path=None, model_name=None):
+        self.vocab = Vocab.load()
         model_name = model_name if model_name else self._name
         path = path if path else "./models/" 
         restorer = tf.train.import_meta_graph(path + model_name + ".meta")
