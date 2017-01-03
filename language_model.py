@@ -105,6 +105,7 @@ class Language_model(object):
         self.inputs = self._add_embedding()
         self.rnn_ouputs, self.final_state = self._run_rnn(self.inputs)
         self.outputs = self._projection_layer(self.rnn_ouputs)
+        self.predictions = tf.nn.softmax(tf.cast(self.outputs, "float64"))
         self.loss_op = self._compute_loss(self.outputs)
         self.trainOp = self._add_train_step(self.loss_op)
 
