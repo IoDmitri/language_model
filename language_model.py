@@ -54,7 +54,7 @@ class Language_model(object):
 
     def _projection_layer(self, rnn_ouputs):
         with tf.variable_scope("Projection") as scope:
-            flattened = tf.reshape(tf.concat(1, rnn_ouputs), (-1, self._hidden_size), name="flattened")
+            flattened = tf.reshape(rnn_ouputs, (-1, self._hidden_size), name="flattened")
             U = tf.get_variable("U", [self._hidden_size, len(self.vocab)])
             b_2 = tf.get_variable("B", [len(self.vocab)])
             outputs = tf.matmul(flattened, U) + b_2       
@@ -125,7 +125,7 @@ class Language_model(object):
                 print "Training preplexity for batch {} - {}".format(epoch, train_pp)
                 if validation_set:
                     validation_pp = self._run_epoch(validation_set, sess, verbose=verbose)
-                    print "Validation preplexity for batch  {} - {}".format(epoch, train_pp)
+                    print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
             if save_path:
                 print "saving model to {0}".format(save_path)
