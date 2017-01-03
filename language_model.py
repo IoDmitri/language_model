@@ -82,6 +82,7 @@ class Language_model(object):
                 trainOp = tf.no_op()
                 drop = 1
             total_steps = sum(1 for x in data_iterator(data, self._batch_size, self._max_steps))
+            state = self.initial_state.eval()
             train_loss = []
             for step, (x,y, l) in enumerate(data_iterator(data, self._batch_size, self._max_steps)):
                 feed = {
@@ -89,8 +90,9 @@ class Language_model(object):
                     self.label_placeholder: y,
                     self.sequence_length: l,
                     self._dropout_placeholder: drop,
+                    self.initial_state: state
                 }
-                loss, _ = sess.run([self.loss_op, trainOp], feed_dict=feed)
+                loss, state, _ = sess.run([self.loss_op, self.final_state, trainOp], feed_dict=feed)
                 train_loss.append(loss)
                 if verbose and step % verbose == 0:
                     sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
