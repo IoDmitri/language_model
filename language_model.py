@@ -20,7 +20,7 @@ class Language_model(object):
         self._max_epochs = max_epochs
         self._lr = lr
         self.vocab = vocab
-        self._is_trained = False
+        self._is_initialized = False
         self._add_placeholders()
         self._current_session= session if session is not None else tf.Session()
         self._name = "language_model"
@@ -121,7 +121,7 @@ class Language_model(object):
         saver = tf.train.Saver()
 
         with self._current_session as sess:
-            sess.run(start)
+            self._maybe_initialize(sess)
 
             for epoch in xrange(self._max_epochs):
                 train_pp = self._run_epoch(data, sess, self.trainOp, verbose)
@@ -155,6 +155,7 @@ class Language_model(object):
 
     def generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, temp=1.0):
         with self._current_session as sess:
+            self._maybe_initialize(sess)
             state = self.initial_state.eval()
             # Imagine tokens as a batch size of one, length of len(tokens[0])
             tokens = [self.vocab.encode(word) for word in starting_text.split()]
@@ -167,7 +168,8 @@ class Language_model(object):
                         self.sequence_length: [1] 
                     }
                 )
-                next_word_idx = sample(y_pred[0], temperature=temp)
+                print "prediction - {0}".format(y_pred)
+                next_word_idx = sample(y_pred, temperature=temp)
                 tokens.append(next_word_idx)
                 if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
                     break
@@ -176,11 +178,16 @@ class Language_model(object):
 
     def generate_sentence(self, *args, **kwargs):
         """Convenice to generate a sentence from the model."""
-        return generate_text(*args, stop_tokens=['<eos>', '<pad>'], **kwargs)
+        return self.generate_text(*args, stop_tokens=['<eos>', '<pad>'], **kwargs)
 
-    def _maybe_initialize(self):
+    def _maybe_initialize(self, session):
         if not self._is_initialized:
-            pass
+            start = tf.global_variables_initializer()
+            with session.as_default() as sess:
+                sess.run(start)
+                self._is_initialized = True
+
+            
 
 
 
