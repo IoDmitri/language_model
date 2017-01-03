@@ -1,4 +1,5 @@
 from collections import defaultdict
+import pickle
 
 import numpy as np
 
@@ -38,6 +39,12 @@ class Vocab(object):
 
   def decode(self, index):
     return self.index_to_word[index]
+
+  def save(self, path="./model/vocab/vocab.pkl"):
+    pickle.dump(self, open(path, 'wb'))
+
+  def load(path="./model/vocab/vocab.pkl"):
+    return pickle.load(open(path, 'rb'))
 
   def __len__(self):
     return len(self.word_freq)
