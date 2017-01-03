@@ -8,7 +8,7 @@ def data_iterator(data, batch_size, max_length_size):
 	sizes = np.zeros([batch_size])
 	i = 1
 	for ex in data:
-		print "ex - {0}".format(ex)
+		#print "ex - {0}".format(ex)
 		#single example
 		if i > batch_size:
 			yield batch_data, labels, sizes
@@ -37,7 +37,7 @@ def multigen(gen_func):
     return _multigen
 
 @multigen
-def process_file_data(f_name, process_fn=None, batch_size=None, flatten=False):
+def process_file_data(f_name, process_fn=None, max_sent_len=None, flatten=False):
 	with open(f_name) as file:
 		for line in file:
 			if flatten:
@@ -45,12 +45,13 @@ def process_file_data(f_name, process_fn=None, batch_size=None, flatten=False):
 					yield word
 				yield "<eos>"
 			else:
-				 _partition_sentence_by_batch_size([process_fn(x) if process_fn else x for x in (line.split() + ['<eos>'])], batch_size)
+				 for sent in _partition_sentence_by_batch_size([process_fn(x) if process_fn else x for x in (line.split() + ['<eos>'])], max_sent_len):
+				 	yield sent
 
-def _partition_sentence_by_batch_size(sentence, batch_size):
-	if not batch_size or len(sentence) <= batch_size:
+def _partition_sentence_by_batch_size(sentence, max_sent_len):
+	if not max_sent_len or len(sentence) <= max_sent_len:
 		yield sentence
-	total_bins = len(sentence) / batch_size
-	total_bins = total_bins
-	for i in range(0, len(sentence), total_bins):
-		yield sentence[i: i+total_bins]
+	else:
+		total_bins = len(sentence) / max_sent_len
+		for i in range(0, len(sentence), max_sent_len):
+			yield sentence[i: i+max_sent_len]

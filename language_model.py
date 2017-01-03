@@ -10,8 +10,7 @@ from vocab import Vocab
 
 
 class Language_model(object):
-
-    def __init__(self, vocab=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=20, lr=0.001):
+    def __init__(self, vocab=None, session=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001):
         self._device = device
         self._batch_size = batch_size
         self._embed_size = embed_size
@@ -21,8 +20,10 @@ class Language_model(object):
         self._max_epochs = max_epochs
         self._lr = lr
         self.vocab = vocab
-        self._is_initialized = False
+        self._is_trained = False
         self._add_placeholders()
+        self._current_session= session if session is not None else tf.Session()
+        self._name = "language_model"
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
@@ -52,18 +53,11 @@ class Language_model(object):
         return outputs, last_state
 
     def _projection_layer(self, rnn_ouputs):
-        #outputs will be off size [batch x max_step x hidden_size]
         with tf.variable_scope("Projection") as scope:
-            flattened = tf.reshape(tf.concat(-1, rnn_ouputs), (-1, self._hidden_size), name="flattened")
+            flattened = tf.reshape(tf.concat(1, rnn_ouputs), (-1, self._hidden_size), name="flattened")
             U = tf.get_variable("U", [self._hidden_size, len(self.vocab)])
             b_2 = tf.get_variable("B", [len(self.vocab)])
             outputs = tf.matmul(flattened, U) + b_2       
-        # rnn_ouputs = [tf.squeeze(s, [1]) for s in tf.split(1, self._max_steps, rnn_ouputs)] 
-        # with tf.variable_scope("Projection") as scope:
-        #     U = tf.get_variable("U", [self._hidden_size, len(self.vocab)])
-        #     b_2 = tf.get_variable("B", [len(self.vocab)])
-        #     outputs = [tf.matmul(x, U) + b_2 for x in rnn_ouputs]
-
             return outputs
 
     def _compute_loss(self,projected_outputs):
@@ -81,8 +75,12 @@ class Language_model(object):
         opt = tf.train.AdamOptimizer(self._lr)
         return opt.minimize(loss)
 
-    def _run_epoch(self, data, session, inputs, rnn_ouputs, loss_op, trainOp, verbose=10):
+    def _run_epoch(self, data, session, trainOp=None, verbose=10):
         with session.as_default() as sess:
+            drop = self._dropout
+            if not trainOp:
+                trainOp = tf.no_op()
+                drop = 1
             total_steps = sum(1 for x in data_iterator(data, self._batch_size, self._max_steps))
             train_loss = []
             for step, (x,y, l) in enumerate(data_iterator(data, self._batch_size, self._max_steps)):
@@ -90,9 +88,9 @@ class Language_model(object):
                     self.input_placeholder: x,
                     self.label_placeholder: y,
                     self.sequence_length: l,
-                    self._dropout_placeholder: self._dropout,
+                    self._dropout_placeholder: drop,
                 }
-                loss, _ = sess.run([loss_op, trainOp], feed_dict=feed)
+                loss, _ = sess.run([self.loss_op, trainOp], feed_dict=feed)
                 train_loss.append(loss)
                 if verbose and step % verbose == 0:
                     sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
@@ -102,28 +100,51 @@ class Language_model(object):
 
             return np.exp(np.mean(train_loss))
 
-
-    def train(self,data, session=tf.Session(), verbose=10):
-
+    def _setup_graph(self):
         print "initializing model"
-        self._add_placeholders()
-        inputs = self._add_embedding()
-        rnn_ouputs, _ = self._run_rnn(inputs)
-        outputs = self._projection_layer(rnn_ouputs)
-        loss = self._compute_loss(outputs)
-        trainOp = self._add_train_step(loss)
-        start = tf.initialize_all_variables()
+        self.inputs = self._add_embedding()
+        self.rnn_ouputs, self.final_state = self._run_rnn(self.inputs)
+        self.outputs = self._projection_layer(self.rnn_ouputs)
+        self.loss_op = self._compute_loss(self.outputs)
+        self.trainOp = self._add_train_step(self.loss_op)
+
+    def train(self,data,verbose=10, validation_set=None, save_path="./models/"):
+        if not self.vocab:
+            self.vocab = Vocab(data)
+
+        self._setup_graph()
+
+        start = tf.global_variables_initializer()
         saver = tf.train.Saver()
 
-        with session as sess:
+        with self._current_session as sess:
             sess.run(start)
 
             for epoch in xrange(self._max_epochs):
-                train_pp = self._run_epoch(data, sess, inputs, rnn_ouputs, loss, trainOp, verbose)
+                train_pp = self._run_epoch(data, sess, self.trainOp, verbose)
                 print "Training preplexity for batch {} - {}".format(epoch, train_pp)
+                if validation_set:
+                    validation_pp = self._run_epoch(validation_set, sess, verbose=verbose)
+                    print "Validation preplexity for batch  {} - {}".format(epoch, train_pp)
 
-    def train_on_file(self, fname):
+            if save_path:
+                print "saving model to {0}".format(save_path)
+                saver.save(sess, save_path + self._name)
+                print "saved model"
+
+    def restore(self, path=None, model_name=None):
+        model_name = model_name if model_name else self._name
+        path = path if path else "./models/" 
+        restorer = tf.train.import_meta_graph(path + model_name + ".meta")
+        restorer.restore(self._current_session, tf.train.latest_checkpoint(path))
+
+
+    def train_on_file(self, fname, validation_fname=None):
         self.vocab = Vocab(process_file_data(fname, flatten=True))
-        self.train(process_file_data(fname, process_fn=self.vocab.encode, batch_size=self._batch_size))
+        validation_gen = None   
+        if validation_fname:
+            validation_gen = process_file_data(validation_fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps)
+
+        self.train(process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps), validation_set=validation_gen)
 
 
