@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.ops.seq2seq import sequence_loss
-from data_utils import data_iterator, process_file_data
+from data_utils import *
 from vocab import Vocab
 # from tensorflow.nn.rnn_cell import GRUCell, DropoutWrapper
 
@@ -149,5 +149,29 @@ class Language_model(object):
             validation_gen = process_file_data(validation_fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps)
 
         self.train(process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps), validation_set=validation_gen)
+
+
+    def generate_text(session, model, config, starting_text='<eos>',stop_length=100, stop_tokens=None, temp=1.0):
+        state = model.initial_state.eval()
+        # Imagine tokens as a batch size of one, length of len(tokens[0])
+        tokens = [model.vocab.encode(word) for word in starting_text.split()]
+        for i in xrange(stop_length):
+            state, y_pred = session.run(
+                [model.final_state, model.predictions[-1]], feed_dict= {
+                model.input_placeholder : [tokens[-1:]],
+                model.initial_state: state,
+                model.dropout_placeholder: config.dropout
+                }
+            )
+            next_word_idx = sample(y_pred[0], temperature=temp)
+            tokens.append(next_word_idx)
+            if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
+                break
+        output = [model.vocab.decode(word_idx) for word_idx in tokens]
+        return output
+
+def generate_sentence(session, model, config, *args, **kwargs):
+    """Convenice to generate a sentence from the model."""
+    return generate_text(session, model, config, *args, stop_tokens=['<eos>'], **kwargs)
 
 
