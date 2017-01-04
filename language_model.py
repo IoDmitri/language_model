@@ -11,7 +11,7 @@ from vocab import Vocab
 
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None):
+    def __init__(self, vocab=None, session=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
         self._device = device
         self._batch_size = batch_size
         self._embed_size = embed_size
@@ -26,6 +26,7 @@ class Language_model(object):
         self._current_session= session if session is not None else tf.Session()
         self._name = "language_model"
         self._save_dir = save_dir
+        self._min_count = min_count
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
@@ -115,7 +116,7 @@ class Language_model(object):
 
     def train(self,data,verbose=10, validation_set=None, save_path=None):
         if not self.vocab:
-            self.vocab = Vocab(data)
+            self.vocab = Vocab(data, min_count = self._min_count)
 
         self._setup_graph()
 
@@ -144,6 +145,8 @@ class Language_model(object):
         self.vocab = Vocab.load()
         model_name = model_name if model_name else self._name
         path = path if path else "./models/" 
+        if self._save_dir:
+            path += self._save_dir + "/"
         self._setup_graph()
         full_path = path + model_name + ".meta"
         print "full path - {0}".format(full_path)
@@ -152,12 +155,14 @@ class Language_model(object):
 
 
     def train_on_file(self, fname, validation_fname=None, save_path="./models/"):
-        self.vocab = Vocab(process_file_data(fname, flatten=True))
+        if self._save_dir:
+            save_path += self._save_dir + "/"
+        self.vocab = Vocab(process_file_data(fname, flatten=True), min_count = self._min_count)
         validation_gen = None   
         if validation_fname:
             validation_gen = process_file_data(validation_fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps)
 
-        self.train(process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps), validation_set=validation_gen, save_path)
+        self.train(process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps), validation_set=validation_gen, save_path=save_path)
 
 
     def generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, session=None, temp=1.0):
