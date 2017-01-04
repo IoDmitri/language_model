@@ -1,4 +1,5 @@
 import sys
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -10,7 +11,7 @@ from vocab import Vocab
 
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001):
+    def __init__(self, vocab=None, session=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None):
         self._device = device
         self._batch_size = batch_size
         self._embed_size = embed_size
@@ -24,6 +25,7 @@ class Language_model(object):
         self._add_placeholders()
         self._current_session= session if session is not None else tf.Session()
         self._name = "language_model"
+        self._save_dir = save_dir
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
@@ -111,7 +113,7 @@ class Language_model(object):
         self.loss_op = self._compute_loss(self.outputs)
         self.trainOp = self._add_train_step(self.loss_op)
 
-    def train(self,data,verbose=10, validation_set=None, save_path="./models/"):
+    def train(self,data,verbose=10, validation_set=None, save_path=None):
         if not self.vocab:
             self.vocab = Vocab(data)
 
@@ -135,26 +137,36 @@ class Language_model(object):
                 saver.save(sess, save_path + self._name)
                 print "saved model"
 
-    def restore(self, path=None, model_name=None):
+    def restore(self, path=None, model_name=None, session=None):
+        if not session:
+            session = self._current_session
+
         self.vocab = Vocab.load()
         model_name = model_name if model_name else self._name
         path = path if path else "./models/" 
         self._setup_graph()
-        restorer = tf.train.import_meta_graph(path + model_name + ".meta")
-        restorer.restore(self._current_session, tf.train.latest_checkpoint(path))
+        full_path = path + model_name + ".meta"
+        print "full path - {0}".format(full_path)
+        restorer = tf.train.import_meta_graph(full_path)
+        restorer.restore(session, tf.train.latest_checkpoint(path))
 
 
-    def train_on_file(self, fname, validation_fname=None):
+    def train_on_file(self, fname, validation_fname=None, save_path="./models/"):
         self.vocab = Vocab(process_file_data(fname, flatten=True))
         validation_gen = None   
         if validation_fname:
             validation_gen = process_file_data(validation_fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps)
 
-        self.train(process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps), validation_set=validation_gen)
+        self.train(process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self._max_steps), validation_set=validation_gen, save_path)
 
 
-    def generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, temp=1.0):
-        with self._current_session as sess:
+    def generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, session=None, temp=1.0):
+        if session is None:
+            session = self._current_session
+        else:
+            session = session.as_default()
+
+        with session as sess:
             self._maybe_initialize(sess)
             state = self.initial_state.eval()
             # Imagine tokens as a batch size of one, length of len(tokens[0])
@@ -168,17 +180,16 @@ class Language_model(object):
                         self.sequence_length: [1] 
                     }
                 )
-                print "prediction - {0}".format(y_pred)
                 next_word_idx = sample(y_pred, temperature=temp)
                 tokens.append(next_word_idx)
-                if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
+                if stop_tokens and self.vocab.decode(tokens[-1]) in stop_tokens:
                     break
-            output = [model.vocab.decode(word_idx) for word_idx in tokens]
+            output = [self.vocab.decode(word_idx) for word_idx in tokens]
             return output
 
-    def generate_sentence(self, *args, **kwargs):
+    def generate_sentence(self, starting_text, stop_length, session=None):
         """Convenice to generate a sentence from the model."""
-        return self.generate_text(*args, stop_tokens=['<eos>', '<pad>'], **kwargs)
+        return self.generate_text(starting_text, stop_length, stop_tokens=['<eos>', '<pad>'], session=session)
 
     def _maybe_initialize(self, session):
         if not self._is_initialized:
@@ -187,7 +198,14 @@ class Language_model(object):
                 sess.run(start)
                 self._is_initialized = True
 
-            
+    def gen_text_shell(self):
+        with tf.variable_scope("gen_text") as scope:
+            with self._current_session as sess:
+                self.restore(session=sess)
+                starting_text = "once upon a time"
+                while starting_text:
+                    print ' '.join(self.generate_sentence(starting_text, 15, sess))
+                    starting_text = raw_input(">")            
 
 
 
