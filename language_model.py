@@ -134,19 +134,25 @@ class Language_model(object):
                     print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
             if save_path:
+                if self._save_dir:
+                    save_path += self._save_dir + "/"
                 print "saving model to {0}".format(save_path)
                 saver.save(sess, save_path + self._name)
                 print "saved model"
+                vocab_path = save_path + "vocab.pkl"
+                print "saving vocab to {0}".format(vocab_path)
+                vocab.save(path=vocab_path)
+                print "vocab saved"
 
     def restore(self, path=None, model_name=None, session=None):
         if not session:
             session = self._current_session
 
-        self.vocab = Vocab.load()
         model_name = model_name if model_name else self._name
         path = path if path else "./models/" 
         if self._save_dir:
             path += self._save_dir + "/"
+        self.vocab = Vocab.load(path=path + "vocab.pkl")
         self._setup_graph()
         full_path = path + model_name + ".meta"
         print "full path - {0}".format(full_path)
