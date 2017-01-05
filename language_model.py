@@ -11,7 +11,8 @@ from vocab import Vocab
 
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
+    def __init__(self, vocab=None, session=None, num_layers = 1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
+        self._num_layers = num_layers
         self._device = device
         self._batch_size = batch_size
         self._embed_size = embed_size
@@ -45,6 +46,7 @@ class Language_model(object):
         self.initial_state = tf.zeros([self._batch_size, self._hidden_size], tf.float32)
         cell = tf.nn.rnn_cell.GRUCell(self._hidden_size)
         cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=self._dropout_placeholder)
+        cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._num_layers)
 
         outputs, last_state = tf.nn.dynamic_rnn(
             cell = cell,
@@ -182,6 +184,18 @@ class Language_model(object):
             state = self.initial_state.eval()
             # Imagine tokens as a batch size of one, length of len(tokens[0])
             tokens = [self.vocab.encode(word) for word in starting_text.split()]
+
+            #prime the network over our inputed sentence
+            for token in tokens[:-1]:
+                state, y_pred = self._current_session.run(
+                    [self.final_state, self.predictions[-1]], feed_dict= {
+                        self.input_placeholder : [tokens[-1:]],
+                        self.initial_state: state,
+                        self._dropout_placeholder: self._dropout,
+                        self.sequence_length: [1] 
+                    }
+                )
+
             for i in xrange(stop_length):
                 state, y_pred = self._current_session.run(
                     [self.final_state, self.predictions[-1]], feed_dict= {

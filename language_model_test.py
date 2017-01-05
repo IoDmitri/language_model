@@ -15,7 +15,7 @@ def test_model():
 def test_on_ptb_test_datast():
 	test_data_file = "./data/ptb.train.txt"
 	validation_data_file = "./data/ptb.valid.txt"
-	model = Language_model(max_steps=10)
+	model = Language_model(max_steps=10, num_layers=2)
 	model.train_on_file(test_data_file, validation_data_file)
 
 if __name__ == "__main__":
