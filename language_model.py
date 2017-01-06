@@ -11,7 +11,7 @@ from vocab import Vocab
 
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, num_layers = 1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
+    def __init__(self, vocab=None, session=None, num_layers=1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
         self._num_layers = num_layers
         self._device = device
         self._batch_size = batch_size
@@ -43,11 +43,11 @@ class Language_model(object):
 
     def _run_rnn(self, inputs):
         # embedded inputs are passed in here
-        self.initial_state = tf.zeros([self._batch_size, self._hidden_size], tf.float32)
         cell = tf.nn.rnn_cell.GRUCell(self._hidden_size)
+        #cell = tf.nn.rnn_cell.LSTMCell(self._hidden_size, state_is_tuple=False)
         cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=self._dropout_placeholder)
-        cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._num_layers)
-
+        cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._num_layers, state_is_tuple=False)
+        self.initial_state = cell.zero_state(self._batch_size, tf.float32)
         outputs, last_state = tf.nn.dynamic_rnn(
             cell = cell,
             inputs = inputs,
@@ -143,7 +143,7 @@ class Language_model(object):
                 print "saved model"
                 vocab_path = save_path + "vocab.pkl"
                 print "saving vocab to {0}".format(vocab_path)
-                vocab.save(path=vocab_path)
+                self.vocab.save(path=vocab_path)
                 print "vocab saved"
 
     def restore(self, path=None, model_name=None, session=None):
