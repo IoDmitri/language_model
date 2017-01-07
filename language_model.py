@@ -135,16 +135,16 @@ class Language_model(object):
                     validation_pp = self._run_epoch(validation_set, sess, verbose=verbose)
                     print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
-            if save_path:
-                if self._save_dir:
-                    save_path += self._save_dir + "/"
-                print "saving model to {0}".format(save_path)
-                saver.save(sess, save_path + self._name)
-                print "saved model"
-                vocab_path = save_path + "vocab.pkl"
-                print "saving vocab to {0}".format(vocab_path)
-                self.vocab.save(path=vocab_path)
-                print "vocab saved"
+                if save_path:
+                    if self._save_dir:
+                        save_path += self._save_dir + "/"
+                    print "saving model to {0}".format(save_path)
+                    saver.save(sess, save_path + self._name)
+                    print "saved model"
+                    vocab_path = save_path + "vocab.pkl"
+                    print "saving vocab to {0}".format(vocab_path)
+                    self.vocab.save(path=vocab_path)
+                    print "vocab saved"
 
     def restore(self, path=None, model_name=None, session=None):
         if not session:
@@ -163,8 +163,6 @@ class Language_model(object):
 
 
     def train_on_file(self, fname, validation_fname=None, save_path="./models/"):
-        if self._save_dir:
-            save_path += self._save_dir + "/"
         self.vocab = Vocab(process_file_data(fname, flatten=True), min_count = self._min_count)
         validation_gen = None   
         if validation_fname:
