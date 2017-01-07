@@ -11,7 +11,7 @@ from vocab import Vocab
 
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, num_layers=1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
+    def __init__(self, vocab=None, session=None, restore=False, num_layers=1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.001, save_dir=None, min_count=None):
         self._num_layers = num_layers
         self._device = device
         self._batch_size = batch_size
@@ -28,6 +28,7 @@ class Language_model(object):
         self._name = "language_model"
         self._save_dir = save_dir
         self._min_count = min_count
+        self._restore = restore
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
@@ -120,6 +121,11 @@ class Language_model(object):
         if not self.vocab:
             self.vocab = Vocab(data, min_count = self._min_count)
 
+        if self._save_dir:
+            save_path += self._save_dir + "/"
+
+        model_save_path = save_path + self._name
+
         self._setup_graph()
 
         start = tf.global_variables_initializer()
@@ -127,6 +133,9 @@ class Language_model(object):
 
         with self._current_session as sess:
             self._maybe_initialize(sess)
+
+            if self._restore:
+                self._maybe_restore(sess, save_path)
 
             for epoch in xrange(self._max_epochs):
                 train_pp = self._run_epoch(data, sess, self.trainOp, verbose)
@@ -136,15 +145,23 @@ class Language_model(object):
                     print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
                 if save_path:
-                    if self._save_dir:
-                        save_path += self._save_dir + "/"
                     print "saving model to {0}".format(save_path)
-                    saver.save(sess, save_path + self._name)
+                    saver.save(sess, model_save_path)
                     print "saved model"
                     vocab_path = save_path + "vocab.pkl"
                     print "saving vocab to {0}".format(vocab_path)
                     self.vocab.save(path=vocab_path)
                     print "vocab saved"
+
+    def _maybe_restore(self, session, f_path):
+        named_path = f_path + "/" + self._name
+        meta_path = named_path + ".meta"
+        if os.path.isfile(meta_path):
+            print "found meta file at location - {0}".format(meta_path)
+            restorer = tf.train.import_meta_graph(meta_path)
+            restorer.restore(session, tf.train.latest_checkpoint(f_path))
+        else:
+            print "No path found from which to restore from"
 
     def restore(self, path=None, model_name=None, session=None):
         if not session:
