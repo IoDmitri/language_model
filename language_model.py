@@ -120,7 +120,7 @@ class Language_model(object):
     def train(self,data,verbose=10, validation_set=None, save_path=None):
         if not self.vocab:
             self.vocab = Vocab(data, min_count = self._min_count)
-
+            
         if self._save_dir:
             save_path += self._save_dir + "/"
 
