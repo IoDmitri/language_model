@@ -20,7 +20,7 @@ class Vocab(object):
 
     if dataset is not None:
       print "constructing dataset"
-    	self.construct(dataset)
+      self.construct(dataset)
 
   def add_word(self, word, count=1, min_count=None):
     self.word_freq[word] += count
