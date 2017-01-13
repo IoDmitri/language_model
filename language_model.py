@@ -67,14 +67,27 @@ class Language_model(object):
             return outputs
 
     def _compute_loss(self,projected_outputs):
-        ones = [tf.ones([self._batch_size * self._max_steps], tf.float32)]
-        seq_loss = sequence_loss(
-            [projected_outputs], 
-            [tf.reshape(self.label_placeholder, [-1])], 
-            ones
-        )
-        tf.add_to_collection('total_loss', seq_loss)
-        loss = tf.add_n(tf.get_collection('total_loss')) 
+        # ones = [tf.ones([self._batch_size * self._max_steps], tf.float32)]
+        # seq_loss = sequence_loss(
+        #     [projected_outputs], 
+        #     [tf.reshape(self.label_placeholder, [-1])], 
+        #     ones
+        # )
+        # tf.add_to_collection('total_loss', seq_loss)
+        # loss = tf.add_n(tf.get_collection('total_loss')) 
+        # return loss
+
+        y_flat = tf.reshape(self.label_placeholder, [-1])
+        losses = tf.nn.sparse_softmax_cross_entropy_with_logits(projected_outputs, y_flat)
+        mask = tf.sign(tf.to_float(y_flat))
+        masked_loss = mask * losses
+
+        masked_loss = tf.reshape(masked_loss, tf.shape(self.label_placeholder))
+
+        mean_loss_by_example = tf.reduce_sum(masked_loss, reduction_indices=1) / self.sequence_length
+        mean_loss = tf.reduce_mean(mean_loss_by_example)
+        tf.add_to_collection("total_loss", mean_loss)
+        loss = tf.add_n(tf.get_collection("total_loss"))
         return loss
 
     def _add_train_step(self, loss):

@@ -17,11 +17,11 @@ def data_iterator(data, batch_size, max_length_size):
 			labels = np.zeros([batch_size, max_length_size])
 			sizes = np.zeros([batch_size])
 		#numpy has 0 based arrays, and the last value from data should be an <eos> token
-		ex_size = len(ex)-1
+		ex_size = len(ex)
 		idx = i-1
-		batch_data[idx, 0:ex_size] = ex[0:-1]
-		labels[idx, 0:ex_size] = ex[1:]
-		sizes[idx] = ex_size - 1
+		batch_data[idx, 0:ex_size -1] = ex[0:-1]
+		labels[idx, 0:ex_size-1] = ex[1:]
+		sizes[idx] = ex_size
 		i +=1
 
 	#at this point we can't fill any more of the batch, so yeild what we've got
