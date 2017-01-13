@@ -62,3 +62,6 @@ def sample(a, temperature=1.0):
     a = np.log(a) / temperature
     a = np.exp(a) / np.sum(np.exp(a))
     return np.argmax(np.random.multinomial(1, a, 1))
+
+def gen_dataset(dataset, fn):
+	return [fn(x) for x in process_file_data(dataset, flatten=True)]
