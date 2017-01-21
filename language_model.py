@@ -93,7 +93,10 @@ class Language_model(object):
 
     def _add_train_step(self, loss):
         opt = tf.train.AdamOptimizer(self._lr)
-        return opt.minimize(loss)
+        tvars = tf.trainable_variables()
+        grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
+        #return opt.minimize(loss)
+        return opt.apply_gradients(zip(grads, tvars))
 
     def _run_epoch(self, data, sess, trainOp=None, verbose=10):
         drop = self._dropout
@@ -181,7 +184,6 @@ class Language_model(object):
             path += self._save_dir + "/"
         self.vocab = Vocab.load(path=path + "vocab.pkl")
         self._setup_graph()
-        #self._maybe_initialize(session)
         full_path = path + model_name + ".meta"
         print "full path - {0}".format(full_path)
         restorer = tf.train.Saver() #tf.train.import_meta_graph(full_path)

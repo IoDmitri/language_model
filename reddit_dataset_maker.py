@@ -5,14 +5,15 @@ from language_model import Language_model
 from vocab import Vocab
 
 num_layers = 1
-hidden_size = 100
-embed_size= 100
-max_epochs = 6
+hidden_size = 150
+embed_size= 150
+max_epochs = 10
+dropout= 0.9
 def gen_reddit_model():
 	#f_name = "./reddit_data/clean_data.txt"
 	f_name = "merged_data.txt"
 	v_file_name = "./reddit_data/valid.txt"
-	model = Language_model(batch_size=100, max_steps=25, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size, max_epochs=max_epochs, min_count=10)
+	model = Language_model(batch_size=100, max_steps=25, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size, max_epochs=max_epochs, dropout=dropout, min_count=10)
 	model.train_on_file(f_name, v_file_name)
 
 def reddit_gen_text():
