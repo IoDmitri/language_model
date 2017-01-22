@@ -31,7 +31,7 @@ class Language_model(object):
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
-            embedding = tf.get_variable("Embedding", [len(self.vocab), self._embed_size], trainable=True)
+            embedding = tf.get_variable("Embedding", [len(self.vocab) + 1, self._embed_size], trainable=True)
             e_x = tf.nn.embedding_lookup(embedding, self.input_placeholder)
             return e_x
 
@@ -62,34 +62,34 @@ class Language_model(object):
     def _projection_layer(self, rnn_ouputs):
         with tf.variable_scope("Projection") as scope:
             flattened = tf.reshape(rnn_ouputs, (-1, self._hidden_size), name="flattened")
-            U = tf.get_variable("U", [self._hidden_size, len(self.vocab)])
-            b_2 = tf.get_variable("B", [len(self.vocab)])
+            U = tf.get_variable("U", [self._hidden_size, len(self.vocab) + 1])
+            b_2 = tf.get_variable("B", [len(self.vocab) + 1])
             outputs = tf.matmul(flattened, U) + b_2       
             return outputs
 
     def _compute_loss(self,projected_outputs):
-        ones = [tf.ones([self._batch_size * self._max_steps], tf.float32)]
-        seq_loss = sequence_loss(
-            [projected_outputs], 
-            [tf.reshape(self.label_placeholder, [-1])], 
-            ones
-        )
-        tf.add_to_collection('total_loss', seq_loss)
-        loss = tf.add_n(tf.get_collection('total_loss')) 
-        return loss
-
-        # y_flat = tf.reshape(self.label_placeholder, [-1])
-        # losses = tf.nn.sparse_softmax_cross_entropy_with_logits(projected_outputs, y_flat)
-        # mask = tf.sign(tf.to_float(y_flat))
-        # masked_loss = mask * losses
-
-        # masked_loss = tf.reshape(masked_loss, tf.shape(self.label_placeholder))
-
-        # mean_loss_by_example = tf.reduce_sum(masked_loss, reduction_indices=1) / tf.to_float(self.sequence_length)
-        # mean_loss = tf.reduce_mean(mean_loss_by_example)
-        # tf.add_to_collection("total_loss", mean_loss)
-        # loss = tf.add_n(tf.get_collection("total_loss"))
+        # ones = [tf.ones([self._batch_size * self._max_steps], tf.float32)]
+        # seq_loss = sequence_loss(
+        #     [projected_outputs], 
+        #     [tf.reshape(self.label_placeholder, [-1])], 
+        #     ones
+        # )
+        # tf.add_to_collection('total_loss', seq_loss)
+        # loss = tf.add_n(tf.get_collection('total_loss')) 
         # return loss
+
+        y_flat = tf.reshape(self.label_placeholder, [-1])
+        losses = tf.nn.sparse_softmax_cross_entropy_with_logits(projected_outputs, y_flat)
+        mask = tf.sign(tf.to_float(y_flat))
+        masked_loss = mask * losses
+
+        masked_loss = tf.reshape(masked_loss, tf.shape(self.label_placeholder))
+
+        mean_loss_by_example = tf.reduce_sum(masked_loss, reduction_indices=1) / (tf.to_float(self.sequence_length) + 1e-12 )
+        mean_loss = tf.reduce_mean(mean_loss_by_example)
+        tf.add_to_collection("total_loss", mean_loss)
+        loss = tf.add_n(tf.get_collection("total_loss"))
+        return loss
 
     def _add_train_step(self, loss):
         opt = tf.train.AdamOptimizer(self._lr)
@@ -115,7 +115,7 @@ class Language_model(object):
                 self.initial_state: state
             }
             loss, state, _ = sess.run([self.loss_op, self.final_state, trainOp], feed_dict=feed)
-            #print "loss - {}".format(loss)
+            # print "loss - {}".format(loss)
             train_loss.append(loss)
             if verbose and step % verbose == 0:
                 sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))

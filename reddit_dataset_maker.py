@@ -7,7 +7,7 @@ from vocab import Vocab
 num_layers = 1
 hidden_size = 150
 embed_size= 150
-max_epochs = 10
+max_epochs = 1
 dropout= 0.9
 def gen_reddit_model():
 	#f_name = "./reddit_data/clean_data.txt"
