@@ -4,18 +4,18 @@ import re
 from language_model import Language_model
 from vocab import Vocab
 
-num_layers = 1
-hidden_size = 150
-embed_size= 150
-max_epochs = 1
-dropout= 0.9
+num_layers = 3
+hidden_size = 250
+embed_size= 250
+max_epochs = 60
+dropout= 0.90
 def gen_reddit_model():
-	#f_name = "./reddit_data/clean_data.txt"
-	f_name = "merged_data.txt"
+	f_name = "./reddit_data/clean_data.txt"
+	#f_name = "merged_data.txt"
 	v_file_name = "./reddit_data/valid.txt"
-	model = Language_model(batch_size=100, max_steps=25, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size, max_epochs=max_epochs, dropout=dropout, min_count=10)
-	model.train_on_file(f_name, v_file_name)
-
+	model = Language_model(batch_size=175, max_steps=25, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size, max_epochs=max_epochs, dropout=dropout, min_count=10)
+	#model.train_on_file(f_name, v_file_name)
+	model.export_latest_model()
 def reddit_gen_text():
 	model = Language_model(batch_size=1, max_steps=1, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size)
 	model.gen_text_shell()

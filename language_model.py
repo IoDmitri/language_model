@@ -4,14 +4,12 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python.ops.seq2seq import sequence_loss
 from data_utils import *
 from vocab import Vocab
-# from tensorflow.nn.rnn_cell import GRUCell, DropoutWrapper
-
+from tensorflow.contrib.session_bundle import exporter
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, restore=False, num_layers=1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.0001, save_dir=None, min_count=None):
+    def __init__(self, vocab=None, session=None, restore=False, num_layers=1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.0001, save_dir=None, min_count=None, cell="gru"):
         self._num_layers = num_layers
         self._device = device
         self._batch_size = batch_size
@@ -28,6 +26,7 @@ class Language_model(object):
         self._save_dir = save_dir
         self._min_count = min_count
         self._restore = restore
+        self._cell = cell
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
@@ -41,11 +40,16 @@ class Language_model(object):
         self.sequence_length = tf.placeholder(tf.int32, shape=[None])
         self._dropout_placeholder = tf.placeholder(tf.float32)
 
+    def _gen_cell(self):
+        if self._cell == "gru":
+            return tf.nn.rnn_cell.GRUCell(self._hidden_size)
+        elif self._cell == "lstm":
+            return tf.nn.rnn_cell.LSTMCell(self._hidden_size, state_is_tuple=False)
+
     def _run_rnn(self, inputs):
         with tf.variable_scope("RNN") as scope:
             # embedded inputs are passed in here
-            cell = tf.nn.rnn_cell.GRUCell(self._hidden_size)
-            #cell = tf.nn.rnn_cell.LSTMCell(self._hidden_size, use_peepholes = True, state_is_tuple=False)
+            cell = self._gen_cell()
             cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=self._dropout_placeholder)
             cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._num_layers, state_is_tuple=False)
             self.initial_state = cell.zero_state(self._batch_size, tf.float32)
@@ -68,16 +72,6 @@ class Language_model(object):
             return outputs
 
     def _compute_loss(self,projected_outputs):
-        # ones = [tf.ones([self._batch_size * self._max_steps], tf.float32)]
-        # seq_loss = sequence_loss(
-        #     [projected_outputs], 
-        #     [tf.reshape(self.label_placeholder, [-1])], 
-        #     ones
-        # )
-        # tf.add_to_collection('total_loss', seq_loss)
-        # loss = tf.add_n(tf.get_collection('total_loss')) 
-        # return loss
-
         y_flat = tf.reshape(self.label_placeholder, [-1])
         losses = tf.nn.sparse_softmax_cross_entropy_with_logits(projected_outputs, y_flat)
         mask = tf.sign(tf.to_float(y_flat))
@@ -95,7 +89,6 @@ class Language_model(object):
         opt = tf.train.AdamOptimizer(self._lr)
         tvars = tf.trainable_variables()
         grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
-        #return opt.minimize(loss)
         return opt.apply_gradients(zip(grads, tvars))
 
     def _run_epoch(self, data, sess, trainOp=None, verbose=10):
@@ -130,7 +123,7 @@ class Language_model(object):
         self.inputs = self._add_embedding()
         self.rnn_ouputs, self.final_state = self._run_rnn(self.inputs)
         self.outputs = self._projection_layer(self.rnn_ouputs)
-        self.predictions = tf.nn.softmax(tf.cast(self.outputs, "float64"))
+        self.predictions = tf.nn.softmax(tf.cast(self.outputs, "float64"), name="predictions")
         self.loss_op = self._compute_loss(self.outputs)
         self.trainOp = self._add_train_step(self.loss_op)
 
@@ -144,8 +137,9 @@ class Language_model(object):
         model_save_path = save_path + self._name
 
         self._setup_graph()
-        saver = tf.train.Saver()
-        with tf.Session() as sess:
+        config = tf.ConfigProto(allow_soft_placement=True)
+        saver = tf.train.Saver(sharded=True)
+        with tf.Session(config=config) as sess:
             self._maybe_initialize(sess)
 
             if self._restore:
@@ -167,6 +161,37 @@ class Language_model(object):
                     self.vocab.save(path=vocab_path)
                     print "vocab saved"
 
+            model_exporter = exporter.Exporter(saver)
+            model_exporter.init(
+                sess.graph.as_graph_def(),
+                named_graph_signatures = {
+                    "inputs": exporter.generic_signature({"words" : self.inputs}),
+                    "outputs": exporter.generic_signature({"output_words": self.predictions})
+                })
+            model_exporter.export(model_save_path + "/ptb", tf.constant(1.0), sess)
+            print "exported model"
+
+    def export_latest_model(self, save_path="./models/"):
+        config = tf.ConfigProto(allow_soft_placement=True)
+        with tf.Session(config=config) as sess:
+            saver = self.restore(session=sess)
+            if self._save_dir:
+                save_path += self._save_dir + "/"
+
+            model_save_path = save_path + self._name
+            model_exporter = exporter.Exporter(saver)
+            model_exporter.init(
+                sess.graph.as_graph_def(),
+                named_graph_signatures = {
+                    "inputs": exporter.generic_signature({"words" : self.inputs}),
+                    "outputs": exporter.generic_signature({"output_words": self.predictions})
+                })
+            model_exporter.export(model_save_path + "/ptb", tf.constant(1.0), sess)
+            print "exported model"
+
+
+
+
     def _maybe_restore(self, session, f_path):
         named_path = f_path + "/" + self._name
         meta_path = named_path + ".meta"
@@ -177,7 +202,7 @@ class Language_model(object):
         else:
             print "No path found from which to restore from"
 
-    def restore(self, path=None, model_name=None, session=None):
+    def restore(self, path=None, model_name=None, session=None, sharded=False):
         model_name = model_name if model_name else self._name
         path = path if path else "./models/" 
         if self._save_dir:
@@ -186,10 +211,10 @@ class Language_model(object):
         self._setup_graph()
         full_path = path + model_name + ".meta"
         print "full path - {0}".format(full_path)
-        restorer = tf.train.Saver() #tf.train.import_meta_graph(full_path)
+        restorer = tf.train.Saver(sharded=sharded)
         print "using path for checkpoint - {0}".format(path)
         restorer.restore(session, tf.train.latest_checkpoint(path)) #tf.train.latest_checkpoint(path))
-
+        return restorer
 
     def train_on_file(self, fname, validation_fname=None, save_path="./models/"):
         self.vocab = Vocab(process_file_data(fname, flatten=True), min_count = self._min_count)
@@ -202,36 +227,37 @@ class Language_model(object):
 
     def generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, session=None, temp=1.0):
         #self._maybe_initialize(sess)
-        state = self.initial_state.eval()
-        # Imagine tokens as a batch size of one, length of len(tokens[0])
-        tokens = [self.vocab.encode(word) for word in starting_text.split()]
+        with session.as_default():
+            state = self.initial_state.eval()
+            # Imagine tokens as a batch size of one, length of len(tokens[0])
+            tokens = [self.vocab.encode(word) for word in starting_text.split()]
 
-        #prime the network over our inputed sentence
-        for token in tokens[:-1]:
-            state, y_pred = session.run(
-                [self.final_state, self.predictions[-1]], feed_dict= {
-                    self.input_placeholder : [tokens[-1:]],
-                    self.initial_state: state,
-                    self._dropout_placeholder: self._dropout,
-                    self.sequence_length: [1] 
-                }
-            )
+            #prime the network over our inputed sentence
+            for token in tokens[:-1]:
+                state, y_pred = session.run(
+                    [self.final_state, self.predictions[-1]], feed_dict= {
+                        self.input_placeholder : [tokens[-1:]],
+                        self.initial_state: state,
+                        self._dropout_placeholder: self._dropout,
+                        self.sequence_length: [1] 
+                    }
+                )
 
-        for i in xrange(stop_length):
-            state, y_pred = session.run(
-                [self.final_state, self.predictions[-1]], feed_dict= {
-                    self.input_placeholder : [tokens[-1:]],
-                    self.initial_state: state,
-                    self._dropout_placeholder: self._dropout,
-                    self.sequence_length: [1] 
-                }
-            )
-            next_word_idx = sample(y_pred, temperature=temp)
-            tokens.append(next_word_idx)
-            if stop_tokens and self.vocab.decode(tokens[-1]) in stop_tokens:
-                break
-        output = [self.vocab.decode(word_idx) for word_idx in tokens]
-        return output
+            for i in xrange(stop_length):
+                state, y_pred = session.run(
+                    [self.final_state, self.predictions[-1]], feed_dict= {
+                        self.input_placeholder : [tokens[-1:]],
+                        self.initial_state: state,
+                        self._dropout_placeholder: self._dropout,
+                        self.sequence_length: [1] 
+                    }
+                )
+                next_word_idx = sample(y_pred, temperature=temp)
+                tokens.append(next_word_idx)
+                if stop_tokens and self.vocab.decode(tokens[-1]) in stop_tokens:
+                    break
+            output = [self.vocab.decode(word_idx) for word_idx in tokens]
+            return output
 
     def generate_sentence(self, starting_text, stop_length, session=None):
         """Convenice to generate a sentence from the model."""
@@ -244,12 +270,13 @@ class Language_model(object):
             self._is_initialized = True
 
     def gen_text_shell(self):
-        with tf.Session() as sess:
-            self.restore(session=sess)
-            starting_text = "once upon a time"
-            while starting_text:
-                print ' '.join(self.generate_sentence(starting_text, 25, sess))
-                starting_text = raw_input(">")
+        # with tf.Session() as sess:
+        sess = tf.Session()
+        self.restore(session=sess)
+        starting_text = "once upon a time"
+        while starting_text:
+            print ' '.join(self.generate_sentence(starting_text, 25, sess))
+            starting_text = raw_input(">")
 
     def test(self):
         with tf.Session() as sess:
