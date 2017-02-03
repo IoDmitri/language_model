@@ -9,7 +9,23 @@ from vocab import Vocab
 from tensorflow.contrib.session_bundle import exporter
 
 class Language_model(object):
-    def __init__(self, vocab=None, session=None, restore=False, num_layers=1, device='gpu', batch_size=64, embed_size=100, hidden_size=100, dropout=0.90, max_steps=45, max_epochs=10, lr=0.0001, save_dir=None, min_count=None, cell="gru"):
+    def __init__(
+        self, 
+        vocab_size,
+        restore=False, 
+        num_layers=1, 
+        device='gpu', 
+        batch_size=64, 
+        embed_size=100, 
+        hidden_size=100, 
+        dropout=0.90, 
+        max_steps=45, 
+        max_epochs=10, 
+        lr=0.0001, 
+        save_dir=None, 
+        cell="gru"
+    ):
+        self._vocab_size=vocab_size
         self._num_layers = num_layers
         self._device = device
         self._batch_size = batch_size
@@ -19,14 +35,9 @@ class Language_model(object):
         self._max_steps = max_steps
         self._max_epochs = max_epochs
         self._lr = lr
-        self.vocab = vocab
-        self._is_initialized = False
-        self._add_placeholders()
-        self._name = "language_model"
-        self._save_dir = save_dir
-        self._min_count = min_count
-        self._restore = restore
         self._cell = cell
+        self._add_placeholders()
+        self._setup_graph()
 
     def _add_embedding(self):
         with tf.device(self._device + ":0"):
@@ -66,7 +77,7 @@ class Language_model(object):
     def _projection_layer(self, rnn_ouputs):
         with tf.variable_scope("Projection") as scope:
             flattened = tf.reshape(rnn_ouputs, (-1, self._hidden_size), name="flattened")
-            U = tf.get_variable("U", [self._hidden_size, len(self.vocab) + 1])
+            U = tf.get_variable("U", [self._hidden_size, self._vocab_size]) #len(self.vocab) + 1])
             b_2 = tf.get_variable("B", [len(self.vocab) + 1])
             outputs = tf.matmul(flattened, U) + b_2       
             return outputs
@@ -161,16 +172,6 @@ class Language_model(object):
                     self.vocab.save(path=vocab_path)
                     print "vocab saved"
 
-            model_exporter = exporter.Exporter(saver)
-            model_exporter.init(
-                sess.graph.as_graph_def(),
-                named_graph_signatures = {
-                    "inputs": exporter.generic_signature({"words" : self.inputs}),
-                    "outputs": exporter.generic_signature({"output_words": self.predictions})
-                })
-            model_exporter.export(model_save_path + "/ptb", tf.constant(1.0), sess)
-            print "exported model"
-
     def export_latest_model(self, save_path="./models/"):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
@@ -188,8 +189,6 @@ class Language_model(object):
                 })
             model_exporter.export(model_save_path + "/ptb", tf.constant(1.0), sess)
             print "exported model"
-
-
 
 
     def _maybe_restore(self, session, f_path):
