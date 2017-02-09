@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify,
 import tensorflow as tf
 
 from config import Config
+from data_utils import normalize_text
 from text_generator import Text_Generator
 
 app = Flask(__name__, template_folder="./")
@@ -12,5 +13,6 @@ gen = Text_Generator("./models/reddit", conf)
 @app.route("/gen_text", methods=["POST"])
 def gen_text():
 	initial_text = request.get_json(force=True)["text"]
-	final_text = " ".join(gen.generate_sentence(initial_text, 25)[:-1])
+	cleaned_text = normalize_text(initial_text)
+	final_text = " ".join(gen.generate_sentence(cleaned_text, 25)[:-1])
 	jsonify({"text" : final_text})
