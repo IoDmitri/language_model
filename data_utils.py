@@ -44,6 +44,20 @@ def ptb_iterator(raw_data, batch_size, num_steps):
 
     yield (x, y, [num_steps * batch_size])
 
+def normalize_text(text):
+	#text = text.decode('utf-8')
+	norm_text = text.lower().strip()
+	norm_text = re.sub('\d', "N", norm_text)
+
+	# Replace breaks with spaces
+	norm_text = norm_text.replace('<br />', ' ')
+
+	# Pad punctuation with spaces on both sides
+	for char in string.punctuation + "`":
+	    norm_text = norm_text.replace(char, ' ' + char + ' ')
+
+	return norm_text
+
 def multigen(gen_func):
     class _multigen(object):
         def __init__(self, *args, **kwargs):
