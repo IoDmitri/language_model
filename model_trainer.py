@@ -18,8 +18,8 @@ class Model_Trainer(object):
 			self.vocab = Vocab.load(path = save_dir + "/" + "vocab.pkl")
 		else: 
 			self.vocab = Vocab(process_file_data(fname, flatten=True), min_count = min_count)
-			self.vocab.save(save_dir + "/" + vocab.pkl)
-			print "saved vocab to {0}".format(save_dir + "/" + vocab.pkl)
+			self.vocab.save(save_dir + "/" + "vocab.pkl")
+			print "saved vocab to {0}".format(save_dir + "/" + "vocab.pkl")
 
 		self.config = config if config else Config()
 		self._model = create_model(len(self.vocab) + 1, config)
@@ -27,8 +27,8 @@ class Model_Trainer(object):
 		self.save_dir=save_dir
 		self.restore_path=restore_path
 		self.verbose=verbose
-		self._data = process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self.config.max_steps)
-		self._validation_set = process_file_data(validation, process_fn=self.vocab.encode, max_sent_len=self.config.max_steps) if validation else None
+		self._data = process_file_data(fname, process_fn=self.vocab.encode, max_sent_len=self.config.max_steps, in_token_form=config.in_token_form)
+		self._validation_set = process_file_data(validation, process_fn=self.vocab.encode, max_sent_len=self.config.max_steps, in_token_form=config.in_token_form) if validation else None
 	
 	def fit(self, save=True):
 		saver = tf.train.Saver()

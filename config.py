@@ -11,7 +11,8 @@ class Config(object):
 		max_epochs=10, 
 		lr=0.0001,
 		cell="gru",
-		name="language_model"
+		name="language_model",
+		in_token_form=False
 	   ):
 		self.num_layers=num_layers
 		self.device=device
@@ -24,3 +25,4 @@ class Config(object):
 		self.lr=lr
 		self.cell=cell
 		self.name="language_model"
+		self.in_token_form=in_token_form

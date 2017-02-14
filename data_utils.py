@@ -1,3 +1,6 @@
+import re
+import string
+
 import numpy as np
 import tensorflow as tf
 
@@ -44,17 +47,18 @@ def ptb_iterator(raw_data, batch_size, num_steps):
 
     yield (x, y, [num_steps * batch_size])
 
-def normalize_text(text):
-	#text = text.decode('utf-8')
+def normalize_text(text, replace_br=True, replace_punct=True):
 	norm_text = text.lower().strip()
 	norm_text = re.sub('\d', "N", norm_text)
 
 	# Replace breaks with spaces
-	norm_text = norm_text.replace('<br />', ' ')
+	if replace_br:
+		norm_text = norm_text.replace('<br />', ' ')
 
-	# Pad punctuation with spaces on both sides
-	for char in string.punctuation + "`":
-	    norm_text = norm_text.replace(char, ' ' + char + ' ')
+	if replace_punct:
+		# Pad punctuation with spaces on both sides
+		for char in string.punctuation + "`":
+		    norm_text = norm_text.replace(char, ' ' + char + ' ')
 
 	return norm_text
 
@@ -68,9 +72,11 @@ def multigen(gen_func):
     return _multigen
 
 @multigen
-def process_file_data(f_name, process_fn=None, max_sent_len=None, flatten=False):
+def process_file_data(f_name, process_fn=None, max_sent_len=None, flatten=False, in_token_form=False):
 	with open(f_name) as file:
 		for line in file:
+			if in_token_form:
+				line = normalize_text(line, replace_br=False, replace_punct=False)
 			if flatten:
 				for word in line.split():
 					yield word

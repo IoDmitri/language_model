@@ -28,9 +28,7 @@ def gen_reddit_model():
 	)
 	trainer = Model_Trainer(f_name, v_file_name, config=conf, save_dir="./models/reddit", min_count=10)
 	trainer.fit()
-	# model = Language_model(batch_size=175, max_steps=25, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size, max_epochs=max_epochs, dropout=dropout, min_count=10)
-	# model.train_on_file(f_name, v_file_name)
-	#model.export_latest_model()
+
 def reddit_gen_text():
 	conf = Config(batch_size=1, num_layers=num_layers, max_steps=1, hidden_size=hidden_size, embed_size=embed_size)
 	gen = Text_Generator("./models/reddit", conf)
@@ -38,8 +36,6 @@ def reddit_gen_text():
         while starting_text:
             print ' '.join(gen.generate_sentence(starting_text, 25))
             starting_text = raw_input(">")
-	# model = Language_model(batch_size=1, max_steps=1, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size)
-	# model.gen_text_shell()
 
 def test():
 	model = Language_model(batch_size=1, max_steps=1, save_dir="reddit", num_layers=num_layers, hidden_size=hidden_size, embed_size=embed_size)
