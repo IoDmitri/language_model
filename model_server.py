@@ -13,8 +13,8 @@ app = Flask(__name__)
 app.debug=True
 CORS(app)
 
-conf = Config(batch_size=1, num_layers=3, max_steps=1, hidden_size=250, embed_size=250)
-gen = Text_Generator("./models/best_reddit", conf)
+conf = Config(batch_size=1, num_layers=3, max_steps=1, hidden_size=250, embed_size=250, device="cpu")
+gen = Text_Generator("./models/reddit", conf)
 
 @app.route("/gen_text", methods=["POST"])
 def gen_text():

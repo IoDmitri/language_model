@@ -9,13 +9,12 @@ class Text_Generator(object):
 	def __init__(self, restore_path, config):
 		self.vocab = Vocab.load(path = restore_path + "/" + "vocab.pkl")
 		self._model = create_model(len(self.vocab) + 1, config)
-		self._sess = tf.Session()
+		self._sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
 		
 		saver = tf.train.Saver()
 		restore_model(restore_path, self._sess, saver)
 
 	def _generate_text(self, starting_text='<eos>',stop_length=100, stop_tokens=None, session=None, temp=1.0):
-		#self._maybe_initialize(sess)
 		with session.as_default():
 			state = self._model.initial_state.eval()
 			# Imagine tokens as a batch size of one, length of len(tokens[0])

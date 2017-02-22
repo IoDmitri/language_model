@@ -10,7 +10,7 @@ from text_generator import Text_Generator
 num_layers = 3
 hidden_size = 250
 embed_size= 250
-max_epochs = 60
+max_epochs = 1
 dropout= 0.90
 
 def gen_reddit_model():

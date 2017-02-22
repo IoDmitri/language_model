@@ -32,7 +32,7 @@ class Model_Trainer(object):
 	
 	def fit(self, save=True):
 		saver = tf.train.Saver()
-		with tf.Session() as sess:
+		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			if self.restore_path:
 				restore_model(self.restore_path, sess, saver)
 			else :
@@ -47,7 +47,7 @@ class Model_Trainer(object):
 				print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
 				if save:
-					save_path = self.save_dir + "/" + self.config.name
+					save_path = self.save_dir + "/" + self.config.name +".cpkt"
 					print "saving model to {0}".format(save_path)
 					saver.save(sess, save_path)
 					print "saved model"
