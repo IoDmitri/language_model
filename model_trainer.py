@@ -47,7 +47,7 @@ class Model_Trainer(object):
 				print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
 				if save:
-					save_path = self.save_dir + "/" + self.config.name +".cpkt"
+					save_path = self.save_dir + "/" + self.config.name
 					print "saving model to {0}".format(save_path)
 					saver.save(sess, save_path)
 					print "saved model"

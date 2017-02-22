@@ -49,16 +49,16 @@ class Language_model(object):
 
     def _gen_cell(self):
         if self._cell == "gru":
-            return tf.nn.rnn_cell.GRUCell(self._hidden_size)
+            return tf.contrib.rnn.GRUCell(self._hidden_size)
         elif self._cell == "lstm":
-            return tf.nn.rnn_cell.LSTMCell(self._hidden_size, state_is_tuple=False)
+            return tf.contrib.rnn.LSTMCell(self._hidden_size, state_is_tuple=False)
 
     def _run_rnn(self, inputs):
         with tf.variable_scope("RNN") as scope:
             # embedded inputs are passed in here
             cell = self._gen_cell()
-            cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=self._dropout_placeholder)
-            cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self._num_layers, state_is_tuple=False)
+            cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=self._dropout_placeholder)
+            cell = tf.contrib.rnn.MultiRNNCell([cell] * self._num_layers, state_is_tuple=False)
             self.initial_state = cell.zero_state(self._batch_size, tf.float32)
             outputs, last_state = tf.nn.dynamic_rnn(
                 cell = cell,
@@ -80,13 +80,13 @@ class Language_model(object):
 
     def _compute_loss(self,projected_outputs):
         y_flat = tf.reshape(self.label_placeholder, [-1])
-        losses = tf.nn.sparse_softmax_cross_entropy_with_logits(projected_outputs, y_flat)
+        losses = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=projected_outputs, labels=y_flat)
         mask = tf.sign(tf.to_float(y_flat))
         masked_loss = mask * losses
 
         masked_loss = tf.reshape(masked_loss, tf.shape(self.label_placeholder))
 
-        mean_loss_by_example = tf.reduce_sum(masked_loss, reduction_indices=1) / (tf.to_float(self.sequence_length) + 1e-12 )
+        mean_loss_by_example = tf.reduce_sum(masked_loss, axis=1) / (tf.to_float(self.sequence_length) + 1e-12 )
         mean_loss = tf.reduce_mean(mean_loss_by_example)
         tf.add_to_collection("total_loss", mean_loss)
         loss = tf.add_n(tf.get_collection("total_loss"))
