@@ -47,8 +47,11 @@ def ptb_iterator(raw_data, batch_size, num_steps):
 
     yield (x, y, [num_steps * batch_size])
 
-def normalize_text(text, replace_br=True, replace_punct=True):
-	norm_text = text.lower().strip()
+def normalize_text(text, replace_br=True, replace_punct=True, lower=True):
+	norm_text = text
+	if lower:
+		norm_text = text.lower()
+	norm_text = norm_text.strip()
 	norm_text = re.sub('\d', "N", norm_text)
 
 	# Replace breaks with spaces

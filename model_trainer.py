@@ -40,19 +40,16 @@ class Model_Trainer(object):
 				sess.run(start)
 
 			for epoch in xrange(self.config.max_epochs):
-				train_pp = self._run_epoch(self._model, self._data, sess, self._model.trainOp, self.verbose)
+				train_pp = self._run_epoch(self._model, self._data, sess, self._model.trainOp, self.verbose, saver)
 				print "Training preplexity for batch {} - {}".format(epoch, train_pp)
 				if self._validation_set:
 					validation_pp = self._run_epoch(self._model, self._validation_set, sess, verbose=self.verbose)
 				print "Validation preplexity for batch  {} - {}".format(epoch, validation_pp)
 
 				if save:
-					save_path = self.save_dir + "/" + self.config.name
-					print "saving model to {0}".format(save_path)
-					saver.save(sess, save_path)
-					print "saved model"
+					self._save_model(sess, saver, False)
 
-	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10):
+	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None):
 		drop = self.config.dropout
 		if not trainOp:
 			trainOp = tf.no_op()
@@ -69,12 +66,22 @@ class Model_Trainer(object):
 				model.initial_state: state
 			}
 			loss, state, _ = sess.run([model.loss_op, model.final_state, trainOp], feed_dict=feed)
-			# print "loss - {}".format(loss)
 			train_loss.append(loss)
 			if verbose and step % verbose == 0:
 				sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
 				sys.stdout.flush()
+				if saver:
+					self._save_model(sess, saver)
 			if verbose:
 				sys.stdout.write('\r')
 
 		return np.exp(np.mean(train_loss))
+
+	def _save_model(self, sess, saver, quiet=True):
+		save_path = self.save_dir + "/" + self.config.name
+		if not quiet:
+			print "saving model to {0}".format(save_path)
+		saver.save(sess, save_path)
+		if not quiet:
+			print "saved model"
+
