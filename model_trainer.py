@@ -32,6 +32,18 @@ class Model_Trainer(object):
 	
 	def fit(self, save=True):
 		saver = tf.train.Saver()
+
+		#for summary
+		pp_tensor = tf.exp(tf.reduce_mean(self._model.loss_op))
+		tf.summary.scalar("preplexity",  pp_tensor)
+
+		summary_op = tf.summary.merge_all()
+
+		log_dir = "./logs"
+		if not os.path.exists(log_dir):
+			os.makedirs(log_dir)
+		writer = tf.summary.FileWriter(log_dir, graph=tf.get_default_graph())
+
 		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			if self.restore_path:
 				restore_model(self.restore_path, sess, saver)
@@ -40,7 +52,7 @@ class Model_Trainer(object):
 				sess.run(start)
 
 			for epoch in xrange(self.config.max_epochs):
-				train_pp = self._run_epoch(self._model, self._data, sess, self._model.trainOp, self.verbose, saver)
+				train_pp = self._run_epoch(self._model, self._data, sess, self._model.trainOp, self.verbose, saver, summary_op, writer)
 				print "Training preplexity for batch {} - {}".format(epoch, train_pp)
 				if self._validation_set:
 					validation_pp = self._run_epoch(self._model, self._validation_set, sess, verbose=self.verbose)
@@ -49,11 +61,15 @@ class Model_Trainer(object):
 				if save:
 					self._save_model(sess, saver, False)
 
-	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None):
+	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None, summaryOp=None, writer=None):
 		drop = self.config.dropout
 		if not trainOp:
 			trainOp = tf.no_op()
 			drop = 1
+
+		if summaryOp is None:
+			summaryOp = tf.no_op()
+
 		total_steps = sum(1 for x in data_iterator(data, self.config.batch_size, self.config.max_steps))
 		state = model.initial_state.eval()
 		train_loss = []
@@ -65,8 +81,12 @@ class Model_Trainer(object):
 				model._dropout_placeholder: drop,
 				model.initial_state: state
 			}
-			loss, state, _ = sess.run([model.loss_op, model.final_state, trainOp], feed_dict=feed)
+			loss, state, _, summary = sess.run([model.loss_op, model.final_state, trainOp, summaryOp], feed_dict=feed)
 			train_loss.append(loss)
+			
+			if summary and writer:
+				writer.add_summary(summary, step)
+
 			if verbose and step % verbose == 0:
 				sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
 				sys.stdout.flush()
