@@ -85,7 +85,7 @@ class Model_Trainer(object):
 			train_loss.append(loss)
 			
 			if summary and writer:
-				writer.add_summary(summary, step*(epoch+1)
+				writer.add_summary(summary, step*(epoch+1))
 
 			if verbose and step % verbose == 0:
 				sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
