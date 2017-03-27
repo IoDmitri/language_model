@@ -85,7 +85,7 @@ class Model_Trainer(object):
 			train_loss.append(loss)
 			
 			if summary and writer:
-				summary_step = step + ((epoch+1) * total_steps)
+				summary_step = step + ((epoch) * total_steps)
 				writer.add_summary(summary,  summary_step)
 
 			if verbose and step % verbose == 0:
