@@ -52,7 +52,7 @@ class Model_Trainer(object):
 				sess.run(start)
 
 			for epoch in xrange(self.config.max_epochs):
-				train_pp = self._run_epoch(self._model, self._data, sess, self._model.trainOp, self.verbose, saver, summary_op, writer)
+				train_pp = self._run_epoch(self._model, self._data, sess, self._model.trainOp, self.verbose, saver, summary_op, writer, epoch)
 				print "Training preplexity for batch {} - {}".format(epoch, train_pp)
 				if self._validation_set:
 					validation_pp = self._run_epoch(self._model, self._validation_set, sess, verbose=self.verbose)
@@ -61,7 +61,7 @@ class Model_Trainer(object):
 				if save:
 					self._save_model(sess, saver, False)
 
-	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None, summaryOp=None, writer=None):
+	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None, summaryOp=None, writer=None, epoch=1):
 		drop = self.config.dropout
 		if not trainOp:
 			trainOp = tf.no_op()
@@ -85,7 +85,7 @@ class Model_Trainer(object):
 			train_loss.append(loss)
 			
 			if summary and writer:
-				writer.add_summary(summary, step)
+				writer.add_summary(summary, step*epoch)
 
 			if verbose and step % verbose == 0:
 				sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
