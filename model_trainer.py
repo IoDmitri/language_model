@@ -37,6 +37,9 @@ class Model_Trainer(object):
 		pp_tensor = tf.exp(tf.reduce_mean(self._model.loss_op))
 		tf.summary.scalar("preplexity",  pp_tensor)
 
+		tf.summary.histogram("rnn_outputs", self._model.rnn_ouputs)
+		tf.summary.histogram("final_state", self._model.final_state)
+
 		summary_op = tf.summary.merge_all()
 
 		log_dir = "./logs"
