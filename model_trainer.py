@@ -61,7 +61,7 @@ class Model_Trainer(object):
 				if save:
 					self._save_model(sess, saver, False)
 
-	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None, summaryOp=None, writer=None, epoch=1):
+	def _run_epoch(self, model, data, sess, trainOp=None, verbose=10, saver=None, summaryOp=None, writer=None, epoch=0):
 		drop = self.config.dropout
 		if not trainOp:
 			trainOp = tf.no_op()
@@ -85,7 +85,7 @@ class Model_Trainer(object):
 			train_loss.append(loss)
 			
 			if summary and writer:
-				writer.add_summary(summary, step*epoch)
+				writer.add_summary(summary, step*(epoch+1)
 
 			if verbose and step % verbose == 0:
 				sys.stdout.write('\r{} / {} : pp = {}'. format(step, total_steps, np.exp(np.mean(train_loss))))
