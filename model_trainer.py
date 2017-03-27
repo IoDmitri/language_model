@@ -42,10 +42,7 @@ class Model_Trainer(object):
 
 		summary_op = tf.summary.merge_all()
 
-		log_dir = "./logs"
-		if not os.path.exists(log_dir):
-			os.makedirs(log_dir)
-		writer = tf.summary.FileWriter(log_dir, graph=tf.get_default_graph())
+		writer = tf.summary.FileWriter(self.save_dir, graph=tf.get_default_graph())
 
 		with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
 			if self.restore_path:
